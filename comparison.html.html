@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서울 지반침하 위험순위 비교지도 | 모델 A vs F</title>
+<style>
+:root{color-scheme:light;--ink:#172536;--secondary:#536377;--border:#e2e8ef;--green:#008577}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Arial,"Malgun Gothic",sans-serif;color:var(--ink)}
+#map{position:absolute;inset:0;width:100%;height:100%}
+#panel{position:absolute;z-index:2;top:14px;left:14px;width:min(350px,calc(100vw - 28px));max-height:calc(100vh - 28px);overflow:auto;background:rgba(255,255,255,.98);border:1px solid var(--border);border-radius:15px;box-shadow:0 6px 28px #0002;padding:17px}
+h1{font-size:18px;margin:0 0 3px;letter-spacing:-.5px}
+.sub{color:var(--secondary);font-size:12px;line-height:1.55;margin:4px 0 14px}
+h2{font-size:13px;margin:13px 0 8px}
+.options{border:1px solid var(--border);border-radius:10px;padding:5px 10px}
+.option{display:flex;gap:8px;align-items:start;padding:8px 0;cursor:pointer;font-size:13px;line-height:1.4}
+.option + .option{border-top:1px solid var(--border)}
+.option input{margin:2px 0 0;accent-color:#1765a5}
+.small{display:block;color:var(--secondary);font-size:11px;margin-top:2px}
+.check{display:block;font-size:12px;margin:8px 1px;cursor:pointer}
+.check input{vertical-align:middle;margin-right:6px;accent-color:#1765a5}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:7px 5px;margin:10px 0;font-size:11px;color:#374253}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+#modelDetails,#status{font-size:12px;line-height:1.55;padding:10px 11px;background:#f4f7fa;border-radius:9px}
+#status{margin-top:8px;color:#48576a;word-break:keep-all}
+#status.error{background:#fff0ee;color:#a02e2b}
+.note{color:#657388;font-size:11px;line-height:1.5;margin:10px 2px 0}
+#mapBadge{position:absolute;z-index:1;right:12px;bottom:20px;background:#fffffff0;border-radius:8px;padding:8px 10px;font-size:11px;box-shadow:0 1px 6px #0002;max-width:260px;pointer-events:none}
+@media(max-width:700px){#panel{top:8px;left:8px;width:min(315px,calc(100vw - 16px));max-height:65vh;padding:13px}#mapBadge{bottom:5px;right:5px;font-size:10px}}
+</style>
+</head>
+<body>
+<div id="map" aria-label="서울 지반침하 위험순위 지도"></div>
+<div id="panel">
+<h1>서울 지반침하 위험순위 비교</h1>
+<p class="sub">2025년 사고 기록을 활용해 평가한 상대 위험순위 · GIS 분석 시제품</p>
+<h2>머신러닝 모델 선택</h2>
+<div class="options">
+ <label class="option"><input type="radio" name="model" value="A" checked><span><b>모델 A · 도로시설</b><span class="small">기존 지도 · 서울 61,636개 격자 기준</span></span></label>
+ <label class="option"><input type="radio" name="model" value="F"><span><b>모델 F · 도로시설 + 굴착공사</b><span class="small">개선 시도 · 공사자료 연결 57,976개 격자 기준</span></span></label>
+</div>
+<h2>지도 레이어</h2>
+<label class="check"><input id="showRisk" type="checkbox" checked> 선택한 모델 위험 상위 10% 격자</label>
+<label class="check"><input id="priority" type="checkbox" checked> 기존 우선조사 후보 (초록 점)</label>
+<label class="check"><input id="accident" type="checkbox" checked> 2025년 사고 위치 (검은 점)</label>
+<div class="legend">
+ <div><span class="sw" style="background:#b71c1c"></span>상위 1%</div>
+ <div><span class="sw" style="background:#ef5350"></span>상위 1~3%</div>
+ <div><span class="sw" style="background:#fb8c00"></span>상위 3~5%</div>
+ <div><span class="sw" style="background:#fdd835"></span>상위 5~10%</div>
+</div>
+<div id="modelDetails" aria-live="polite">모델 A: 위험 상위 10% 6,164개 격자. 도로시설 면적비율을 입력변수로 사용.</div>
+<div id="status" role="status">지도 및 데이터 불러오는 중…</div>
+<p class="note">주의: 색상은 모델별 상대 위험순위이며 실제 싱크홀 발생확률이 아닙니다. 모델 F의 굴착 변수는 실제 공사지점이 아닌 자치구 단위의 <b>전년도 공사 기록 밀도(건/km²)</b>입니다. F 모델은 서울 전체 61,636개 중 57,976개 격자만 분석했으며 나머지 3,660개 격자는 저위험 판정이 아니라 분석 제외입니다. 기존 우선조사 후보는 모델 A로 산출한 결과입니다.</p>
+</div>
+<div id="mapBadge">공공데이터 기반 탐색적 분석 · 실제 현장 안전진단 대체 불가</div>
+<script>
+'use strict';
+const colorByZone={'상위 1%':'#b71c1c','상위 1~3%':'#ef5350','상위 3~5%':'#fb8c00','상위 5~10%':'#fdd835'};
+const $=id=>document.getElementById(id);
+const fmtNumber=x=>Number.isFinite(Number(x))?Number(x).toLocaleString('ko-KR'):'정보 없음';
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function prop(feature,key){return feature.getProperty(key);}
+function popupLine(label,value){return '<br>'+escapeHtml(label)+': '+escapeHtml(value);}
+
+async function initMap(){
+ const map=new google.maps.Map($('map'),{center:{lat:37.5665,lng:126.978},zoom:11,mapTypeId:'roadmap',mapTypeControl:true,streetViewControl:false});
+ const info=new google.maps.InfoWindow();
+ const layers={
+  A:new google.maps.Data(), F:new google.maps.Data(),
+  priority:new google.maps.Data(), accident:new google.maps.Data()
+ };
+ const loaded={}; let selected='A';
+ function polygonStyle(feature){const c=colorByZone[prop(feature,'zone')]||'#8b98a5';return {fillColor:c,fillOpacity:.42,strokeColor:c,strokeOpacity:.47,strokeWeight:.55,zIndex:1};}
+ layers.A.setStyle(polygonStyle);
+ layers.F.setStyle(polygonStyle);
+ layers.priority.setStyle({icon:{path:google.maps.SymbolPath.CIRCLE,scale:5,fillColor:'#008577',fillOpacity:1,strokeColor:'#fff',strokeWeight:1.4},zIndex:4});
+ layers.accident.setStyle({icon:{path:google.maps.SymbolPath.CIRCLE,scale:4,fillColor:'#111',fillOpacity:1,strokeColor:'#fff',strokeWeight:1},zIndex:6});
+ const files={A:'step60_google_risk.geojson',F:'model_F_2025_top10.geojson',priority:'step60_google_priority.geojson',accident:'step60_google_accident.geojson'};
+ function updateDetails(){
+  $('modelDetails').innerHTML= selected==='A'
+   ?'<b>모델 A</b> · 도로시설 면적비율 기준<br>상위 10%: 6,164개 / 전체 61,636개 격자<br>2025년 ROC-AUC: 약 0.709 (전체 평가)'
+   :'<b>모델 F</b> · 도로시설 + 전년도 자치구별 공사기록 밀도<br>상위 10%: 5,798개 / 평가 57,976개 격자<br>동일 평가범위의 A 대비 사고 포착: 7/34 → 8/34<br>ROC-AUC: A 0.7165 / F 0.7134';
+ }
+ function setVisibility(){
+  layers.A.setMap(selected==='A'&&$('showRisk').checked&&loaded.A?map:null);
+  layers.F.setMap(selected==='F'&&$('showRisk').checked&&loaded.F?map:null);
+  layers.priority.setMap($('priority').checked&&loaded.priority?map:null);
+  layers.accident.setMap($('accident').checked&&loaded.accident?map:null);
+  updateDetails();
+ }
+ document.querySelectorAll('input[name="model"]').forEach(el=>el.addEventListener('change',e=>{if(e.target.checked){selected=e.target.value;info.close();setVisibility();}}));
+ ['showRisk','priority','accident'].forEach(id=>$(id).addEventListener('change',setVisibility));
+ for(const name of Object.keys(layers)){
+  layers[name].addListener('click',event=>{
+   const f=event.feature;
+   let msg='<b>'+escapeHtml(name==='priority'?'기존 우선조사 후보':name==='accident'?'2025년 지반침하 사고':'격자 '+prop(f,'grid_id'))+'</b>';
+   if(name==='A'){
+     msg+=popupLine('모델','A · 도로시설')+popupLine('상대 위험순위',prop(f,'zone'));
+     msg+=popupLine('도로시설 면적비율',Number(prop(f,'road_facility_pct')).toFixed(2)+'%');
+   }else if(name==='F'){
+     msg+=popupLine('모델','F · 도로시설 + 굴착공사')+popupLine('상대 위험순위',prop(f,'zone'));
+     msg+=popupLine('도로시설 면적비율',Number(prop(f,'road_facility_pct')).toFixed(2)+'%');
+     const density=Number(prop(f,'exc_prevyear_density'));
+     msg+=popupLine('전년도 자치구 공사기록 밀도',Number.isFinite(density)?density.toFixed(2)+'건/km²':'자료 없음');
+     msg+=popupLine('모델 F 상대 점수',Number(prop(f,'score_F')).toFixed(4));
+     msg+='<br><small>※ 점수는 실제 사고 발생확률이 아닙니다.</small>';
+   }else if(name==='priority'){
+     msg+=popupLine('격자 ID',prop(f,'grid_id'));
+     const pv=prop(f,'pop_value');
+     if(pv!==undefined&&pv!==null)msg+=popupLine(prop(f,'pop_label')||'인구',fmtNumber(pv)+'명');
+     msg+='<br><small>※ 기존 모델 A 기반 후보입니다.</small>';
+   }else if(name==='accident'){
+     msg+=popupLine('사고번호',prop(f,'sagoNo'));
+     msg+=popupLine('자치구',prop(f,'sigungu'));
+     const raw=String(prop(f,'sagoDate')||'');
+     if(/^\d{8}$/.test(raw))msg+=popupLine('사고일',raw.slice(0,4)+'-'+raw.slice(4,6)+'-'+raw.slice(6,8));
+     msg+='<br><small>※ 주소 기반 변환 좌표일 수 있습니다.</small>';
+   }
+   info.setContent(msg);info.setPosition(event.latLng);info.open(map);
+  });
+ }
+ const result=await Promise.allSettled(Object.entries(files).map(async ([name,file])=>{
+  const response=await fetch(file,{cache:'no-store'});
+  if(!response.ok)throw Error(file+' (HTTP '+response.status+')');
+  const data=await response.json();
+  const features=layers[name].addGeoJson(data);
+  loaded[name]=features.length;
+  setVisibility();
+  return name+': '+features.length.toLocaleString('ko-KR')+'개';
+ }));
+ const ok=result.filter(r=>r.status==='fulfilled').map(r=>r.value);
+ const errors=result.filter(r=>r.status==='rejected').map(r=>String(r.reason?.message||r.reason));
+ $('status').classList.toggle('error',errors.length>0);
+ $('status').textContent=(ok.length?'불러오기 완료 — '+ok.join(' / '):'표시할 지도를 불러오지 못했습니다.')+(errors.length?' · 오류: '+errors.join(' ; '):'');
+ setVisibility();
+}
+window.initMap=initMap;
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCGQ9urdbHPNGdtaqGajRH_8LoQZp-sLb0&loading=async&callback=initMap&v=weekly&language=ko"></script>
+</body>
+</html>
