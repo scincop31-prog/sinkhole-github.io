@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>서울 지반침하 위험순위 지도 | A·F·G 비교</title>
+<style>
+:root{--ink:#162537;--muted:#66768a;--line:#e5eaf0;--blue:#1877b6;--card:#fff;--bg:#f5f7fa;--risk1:#bd2535;--risk2:#ec6540;--risk3:#f0a13b;--risk4:#f9cf59;--priority:#008caf;--accident:#6e43cb}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;font-family:Arial,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;color:var(--ink)}
+button,input{font:inherit} button{cursor:pointer}
+#map{position:absolute;inset:0;background:#eaf0f0}
+#sidebar{position:absolute;left:16px;top:16px;z-index:4;width:322px;max-height:calc(100vh - 32px);overflow-y:auto;background:rgba(255,255,255,.985);border:1px solid #e4e8ef;box-shadow:0 9px 35px rgba(18,40,60,.20);border-radius:16px;padding:17px 18px 12px;scrollbar-width:thin}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:5px}
+.eyebrow{font-size:9px;font-weight:800;letter-spacing:1.4px;color:var(--blue);margin:0 0 4px}
+h1{font-size:17px;letter-spacing:-.6px;margin:0;line-height:1.35}
+.subtitle{font-size:11px;color:var(--muted);margin:5px 0 13px;line-height:1.4}
+#closePanel{padding:5px 8px;border:1px solid var(--line);background:#fff;border-radius:7px;color:#405163;white-space:nowrap;font-size:11px}
+.sectionTitle{font-size:10px;font-weight:800;color:#506079;letter-spacing:.3px;margin:12px 0 7px}
+.models{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.model{position:relative;cursor:pointer}
+.model input{position:absolute;opacity:0;pointer-events:none}
+.model .tile{min-height:55px;border:1px solid #dfe6ef;border-radius:10px;background:#fff;padding:7px 5px;text-align:center;display:flex;flex-direction:column;justify-content:center;gap:4px;transition:background .15s,border-color .15s}
+.model .initial{font-size:15px;font-weight:800;line-height:1}
+.model .desc{font-size:9px;font-weight:700;color:#506176;white-space:nowrap}
+.model input:checked+.tile{background:#eaf4fb;border-color:#1975ae;box-shadow:inset 0 0 0 1px #1975ae}
+.model input:focus-visible+.tile{outline:3px solid #8fc6ec;outline-offset:2px}
+#summary{border-radius:10px;background:#f2f6f9;margin:10px 0 11px;padding:10px 11px}
+#summaryTitle{font-size:11px;font-weight:800;margin-bottom:7px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metricValue{font-size:19px;letter-spacing:-.4px;font-weight:800;line-height:1.1}
+.metricLabel{font-size:10px;color:#68778a;margin-top:3px}
+#summaryNote{color:#728093;font-size:10px;line-height:1.4;margin-top:7px}
+.sep{height:1px;background:var(--line);margin:12px 0 11px}
+.layers{display:flex;flex-direction:column;gap:8px}
+.layer{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:600;cursor:pointer;min-height:25px}
+.layer input{margin:0;accent-color:#1177b2;width:14px;height:14px;flex:0 0 14px}
+.legendIcon{display:inline-flex;width:23px;height:23px;align-items:center;justify-content:center;flex:0 0 23px}
+.legendIcon.square:before{content:"";display:block;width:13px;height:13px;border-radius:2px;background:#d94d43;border:1px solid #a93634}
+.legendIcon.diamond:before{content:"";display:block;width:13px;height:13px;background:var(--priority);border:2px solid white;box-shadow:0 0 0 1px #087e9d;transform:rotate(45deg)}
+.legendIcon.star{color:var(--accident);font-size:23px;font-weight:900;text-shadow:-1px -1px 0 white,1px 1px 0 white}
+.legendColors{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:4px 0 12px;font-size:10px;color:#48586a}
+.legendColors div{display:flex;align-items:center;gap:6px}
+.swatch{display:inline-block;width:14px;height:11px;border-radius:2px;border:1px solid #0001;flex:0 0 14px}
+.numbers{font-size:10px;color:#758294}
+#loading{font-size:10px;color:#617084;margin-top:8px;white-space:normal}
+#loading.error{color:#ae3030}
+.source{font-size:10px;line-height:1.5;color:#748093;padding:8px 0 0;border-top:1px solid var(--line)}
+details{margin:8px 0;border:1px solid var(--line);border-radius:9px;overflow:hidden;font-size:10px}
+summary{background:#f9fbfc;color:#42536a;cursor:pointer;font-size:11px;font-weight:700;padding:9px 10px;list-style-position:inside}
+.detailBody{padding:9px 10px;color:#516176;line-height:1.65}
+.detailBody p{margin:0 0 6px}
+.detailBody p:last-child{margin-bottom:0}
+.detailBody table{width:100%;font-size:10px;border-collapse:collapse;margin-top:5px}
+.detailBody td{border-bottom:1px solid var(--line);padding:4px 2px;vertical-align:top}
+.detailBody td:last-child{text-align:right}
+#reopen{display:none;position:absolute;left:16px;top:16px;z-index:5;background:#fff;border:1px solid var(--line);box-shadow:0 3px 16px #0002;padding:11px 14px;border-radius:10px;font-weight:800;font-size:12px}
+body.panelClosed #sidebar{display:none}
+body.panelClosed #reopen{display:block}
+#tag{position:absolute;bottom:18px;right:16px;z-index:2;background:#fffE;border:1px solid #ebeff3;padding:7px 10px;border-radius:8px;font-size:10px;color:#5b6878;pointer-events:none}
+@media(max-width:680px){#sidebar{left:8px;top:8px;width:min(306px,calc(100vw - 16px));max-height:min(80vh,660px);padding:14px}#reopen{left:8px;top:8px}#tag{right:7px;bottom:7px;font-size:9px}}
+</style>
+</head>
+<body>
+<div id="map" aria-label="서울 지반침하 상대 위험순위 GIS 지도"></div>
+<button id="reopen" type="button" aria-label="지도 메뉴 열기">☰ 지도 메뉴 열기</button>
+<aside id="sidebar" aria-label="GIS 지도 조작 패널">
+ <div class="header"><div><p class="eyebrow">SEOUL · GEO RISK</p><h1>지반침하 위험순위 지도</h1></div><button id="closePanel" type="button" aria-label="지도 메뉴 접기">접기</button></div>
+ <p class="subtitle">서울 약 100m 격자 · 상대 위험순위 (발생확률 아님)</p>
+ <div class="sectionTitle">분석 모델</div>
+ <div class="models" role="radiogroup" aria-label="머신러닝 모델 선택">
+  <label class="model"><input type="radio" name="model" value="A" checked><span class="tile"><span class="initial">A</span><span class="desc">도로시설</span></span></label>
+  <label class="model"><input type="radio" name="model" value="F"><span class="tile"><span class="initial">F</span><span class="desc">+ 굴착공사</span></span></label>
+  <label class="model"><input type="radio" name="model" value="G"><span class="tile"><span class="initial">G</span><span class="desc">+ 노후관로</span></span></label>
+ </div>
+ <section id="summary" aria-live="polite">
+  <div id="summaryTitle">모델 A · 도로시설</div>
+  <div class="metrics"><div><div class="metricValue" id="countRank">6,164</div><div class="metricLabel">위험순위 상위 10% 격자</div></div><div><div class="metricValue" id="countHit">7 / 36</div><div class="metricLabel">2025년 사고 격자 포착</div></div></div>
+  <div id="summaryNote">전체 서울 61,636개 격자 기준</div>
+ </section>
+ <div class="sectionTitle">지도 표시</div>
+ <div class="layers">
+   <label class="layer"><input id="showRisk" type="checkbox" checked><span class="legendIcon square" aria-hidden="true"></span>위험순위 상위 10% 격자</label>
+   <label class="layer"><input id="priority" type="checkbox" checked><span class="legendIcon diamond" aria-hidden="true"></span>우선조사 후보 <span class="numbers">270곳 · 모델 A 기준</span></label>
+   <label class="layer"><input id="accident" type="checkbox" checked><span class="legendIcon star" aria-hidden="true">★</span>2025년 사고기록 <span class="numbers">39개 좌표</span></label>
+ </div>
+ <div class="sep"></div>
+ <div class="sectionTitle">격자 위험순위 범례</div>
+ <div class="legendColors" aria-label="상대 위험순위 색상 범례">
+   <div><i class="swatch" style="background:#bd2535"></i>상위 1%</div>
+   <div><i class="swatch" style="background:#ec6540"></i>상위 1~3%</div>
+   <div><i class="swatch" style="background:#f0a13b"></i>상위 3~5%</div>
+   <div><i class="swatch" style="background:#f9cf59"></i>상위 5~10%</div>
+ </div>
+ <div class="source">출처: 국토교통부 · 서울특별시 · 통계청 SGIS<br>단위: 격자 약 100m / 분석 EPSG:5179 · 지도 WGS84</div>
+ <details id="details"><summary>자료·검증 기준 보기</summary>
+  <div class="detailBody">
+   <p><b>절차</b> 사고기록 → 100m 격자화 → 로지스틱 회귀 → 2025년 평가</p>
+   <table><tr><td>A · 도로시설</td><td>전체 61,636격자</td></tr><tr><td>F · 굴착공사</td><td>평가 57,976격자</td></tr><tr><td>G · 노후 하수관로</td><td>평가 57,976격자</td></tr></table>
+   <p><b>2025 검증 AUC</b> A 0.709 · F 0.713 · G 0.654<br><span style="color:#8b5860">※ A, F, G는 학습기간·평가범위가 달라 이 수치만으로 직접 우열 비교 불가.</span></p>
+   <p><b>변수 단위</b> 도로시설: 격자 면적비율(%) · 굴착: 전년도 자치구 공사기록 밀도(건/km²) · 하수관: 자치구 30년 이상 노후관 비율(%).</p>
+   <p><b>한계</b> 색은 발생확률이 아닌 상대순위. F·G는 3,660격자 분석 제외. 사고 좌표는 주소 변환이 포함됨. G의 2024년 통계는 시점상 제한 있음.</p>
+  </div>
+ </details>
+ <div id="loading" role="status" aria-live="polite">지도 데이터 불러오는 중…</div>
+</aside>
+<div id="tag">상대 위험순위 · 현장 안전진단 대체 불가</div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const colors={'상위 1%':'#bd2535','상위 1~3%':'#ec6540','상위 3~5%':'#f0a13b','상위 5~10%':'#f9cf59'};
+const models={
+ A:{title:'모델 A · 도로시설', top:'6,164', hit:'7 / 36', note:'전체 61,636개 격자 · ROC-AUC 0.709'},
+ F:{title:'모델 F · 도로시설 + 굴착공사', top:'5,798', hit:'8 / 34', note:'평가 57,976개 격자 · ROC-AUC 0.713'},
+ G:{title:'모델 G · 도로시설 + 굴착공사 + 노후 하수관로', top:'5,797', hit:'8 / 34', note:'평가 57,976개 격자 · ROC-AUC 0.654'}
+};
+const sources={A:'step60_google_risk.geojson',F:'model_F_2025_top10.geojson',G:'model_G_2025_top10.geojson',priority:'step60_google_priority.geojson',accident:'step60_google_accident.geojson'};
+function esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function v(f,key){return f.getProperty(key);}
+function nfmt(value,digits=2){let n=Number(value);return value===undefined||value===null||!Number.isFinite(n)?'자료 없음':n.toLocaleString('ko-KR',{minimumFractionDigits:digits,maximumFractionDigits:digits});}
+function item(label,value){return '<div style="margin:5px 0"><span style="color:#66788b">'+esc(label)+'</span>　<b>'+esc(value)+'</b></div>';}
+function selectModel(name){const m=models[name];$('summaryTitle').textContent=m.title;$('countRank').textContent=m.top;$('countHit').textContent=m.hit;$('summaryNote').textContent=m.note;}
+$('closePanel').onclick=()=>document.body.classList.add('panelClosed');
+$('reopen').onclick=()=>document.body.classList.remove('panelClosed');
+function initMap(){
+ const map=new google.maps.Map($('map'),{
+  center:{lat:37.5665,lng:126.978},zoom:11,mapTypeId:'roadmap',
+  scaleControl:true,scaleControlOptions:{position:google.maps.ControlPosition.BOTTOM_LEFT},
+  mapTypeControl:true,streetViewControl:false,fullscreenControl:true,zoomControl:true
+ });
+ const info=new google.maps.InfoWindow();
+ const layers={A:new google.maps.Data(),F:new google.maps.Data(),G:new google.maps.Data(),priority:new google.maps.Data(),accident:new google.maps.Data()};
+ const loaded={};let selected='A';
+ const styleRisk=f=>{const c=colors[v(f,'zone')]||'#94a3b8';return {fillColor:c,fillOpacity:.57,strokeColor:c,strokeOpacity:.33,strokeWeight:.5,zIndex:1};};
+ for(const name of ['A','F','G'])layers[name].setStyle(styleRisk);
+ // Different shapes AND colors ensure inspection candidates and incident locations are distinct.
+ layers.priority.setStyle({icon:{path:'M 0,-9 L 9,0 L 0,9 L -9,0 Z',scale:1.17,fillColor:'#008caf',fillOpacity:1,strokeColor:'#fff',strokeWeight:2.4,strokeOpacity:1},zIndex:10});
+ layers.accident.setStyle({icon:{path:'M 0,-10 L 3,-3.3 L 10,-3.2 L 4.6,1.5 L 6.4,9 L 0,5.3 L -6.4,9 L -4.6,1.5 L -10,-3.2 L -3,-3.3 Z',scale:1.15,fillColor:'#6e43cb',fillOpacity:1,strokeColor:'#fff',strokeWeight:2.5,strokeOpacity:1},zIndex:14});
+ function visible(){
+  ['A','F','G'].forEach(name=>layers[name].setMap(selected===name&&$('showRisk').checked&&loaded[name]?map:null));
+  layers.priority.setMap($('priority').checked&&loaded.priority?map:null);
+  layers.accident.setMap($('accident').checked&&loaded.accident?map:null);
+  selectModel(selected);
+ }
+ document.querySelectorAll('input[name="model"]').forEach(input=>input.addEventListener('change',()=>{if(input.checked){selected=input.value;info.close();visible();}}));
+ for(const name of ['showRisk','priority','accident'])$(name).addEventListener('change',visible);
+ for(const [name,layer] of Object.entries(layers)){
+  layer.addListener('click',e=>{
+   const f=e.feature;let title,rows='';
+   if(['A','F','G'].includes(name)){
+    title='격자 '+esc(v(f,'grid_id'));
+    rows+=item('모델',name)+item('위험순위',v(f,'zone'))+item('도로시설 면적비율',nfmt(v(f,'road_facility_pct'))+'%');
+    if(name==='F'||name==='G')rows+=item('전년도 자치구 공사기록 밀도',nfmt(v(f,'exc_prevyear_density'))+'건/km²');
+    if(name==='G')rows+=item('자치구 노후 하수관로 비율',nfmt(v(f,'sewer_aged30_pct'))+'%');
+    rows+='<div style="font-size:10px;color:#657589;margin-top:8px">※ 상대순위이며 실제 발생확률이 아닙니다.</div>';
+   }else if(name==='priority'){
+    title='◆ 우선조사 후보';rows+=item('격자 ID',v(f,'grid_id'));
+    const pop=v(f,'pop_value');if(pop!==undefined&&pop!==null)rows+=item(v(f,'pop_label')||'인구',nfmt(pop,0)+'명');
+    rows+='<div style="font-size:10px;color:#657589;margin-top:8px">기존 모델 A와 인구기준으로 선정</div>';
+   }else{
+    title='★ 2025년 사고기록';rows+=item('사고번호',v(f,'sagoNo'))+item('자치구',v(f,'sigungu'));
+    const raw=String(v(f,'sagoDate')??'');if(/^\d{8}$/.test(raw))rows+=item('발생일',raw.slice(0,4)+'-'+raw.slice(4,6)+'-'+raw.slice(6,8));
+    rows+='<div style="font-size:10px;color:#657589;margin-top:8px">주소기반 변환 좌표가 포함될 수 있음</div>';
+   }
+   info.setContent('<div style="min-width:170px;font:12px/1.5 Arial,Malgun Gothic,sans-serif"><b style="font-size:13px">'+title+'</b>'+rows+'</div>');info.setPosition(e.latLng);info.open(map);
+  });
+ }
+ visible();
+ Promise.allSettled(Object.entries(sources).map(async ([name,src])=>{
+  const res=await fetch(src,{cache:'no-store'});if(!res.ok)throw new Error(src+': '+res.status);
+  const geo=await res.json();const features=layers[name].addGeoJson(geo);
+  loaded[name]=features.length;visible();return name+': '+features.length+'개';
+ })).then(res=>{
+  const errors=res.filter(r=>r.status==='rejected').map(r=>String(r.reason));
+  $('loading').textContent=errors.length?'일부 파일 로딩 오류: '+errors.join(' / '):'데이터 로딩 완료';
+  $('loading').classList.toggle('error',errors.length>0);
+ });
+}
+window.initMap=initMap;
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCGQ9urdbHPNGdtaqGajRH_8LoQZp-sLb0&loading=async&callback=initMap&v=weekly&language=ko"></script>
+</body></html>
